@@ -1,5 +1,8 @@
 require "test/unit"
+require "rack"
 require "rack/test"
+require "rack/builder"
+require "rack/null_logger"
 require "rack-timeout"
 
 class RackTimeoutTest < Test::Unit::TestCase
@@ -27,7 +30,7 @@ class RackTimeoutTest < Test::Unit::TestCase
     end
   end
 
-  # runs the test with the given environment, but doesnt restore the original
+  # runs the test with the given environment, but doesn't restore the original
   # environment afterwards. This should be sufficient for rack-timeout testing.
   def with_env(hash)
     hash.each_pair do |k, v|
@@ -41,5 +44,10 @@ class RackTimeoutTest < Test::Unit::TestCase
 
   def time_in_msec(t = Time.now)
     "#{t.tv_sec}#{t.tv_usec/1000}"
+  end
+
+  def time_in_usec(t = Time.now)
+    # time in microseconds, currently 16 digits
+    "%d%06d" % [t.tv_sec, t.tv_usec]
   end
 end

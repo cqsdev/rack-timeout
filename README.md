@@ -47,7 +47,7 @@ only:              []     # RACK_TIMEOUT_ONLY
 
 Both `exclude` and `only` can be used at the same time, in this case excluded paths will be substracted from the `only` array.
 
-These settings can be overriden during middleware initialization or
+These settings can be overridden during middleware initialization or
 environment variables `RACK_TIMEOUT_*` mentioned above. Middleware
 parameters take precedence:
 
@@ -56,8 +56,41 @@ use Rack::Timeout::Select, service_timeout: 5, exclude: ["api"]
 ```
 [Demo application](https://github.com/mkrl/rack-timeout-test)
 
-Please note that you may have controller actions with names similar to your excludes/targets, use with wise.
+For more on these settings, please see [doc/settings](doc/settings.md).
+
+Further Documentation
+---------------------
+
+Please see the [doc](doc) folder for further documentation on:
+
+* [Risks and shortcomings of using Rack::Timeout](doc/risks.md)
+* [Understanding the request lifecycle](doc/request-lifecycle.md)
+* [Exceptions raised by Rack::Timeout](doc/exceptions.md)
+* [Rollbar fingerprinting](doc/rollbar.md)
+* [Observers](doc/observers.md)
+* [Settings](doc/settings.md)
+* [Logging](doc/logging.md)
+
+Additionally there is a [demo app](https://github.com/zombocom/rack_timeout_demos)
+that shows the impact of changing settings and how the library behaves
+when a timeout is hit.
+
+Contributing
+------------
+
+Run the test suite:
+
+```console
+bundle
+bundle exec rake test
+```
+
+Compatibility
+-------------
+
+This version of Rack::Timeout is compatible with Ruby 2.3 and up, and,
+for Rails apps, Rails 3.x and up.
 
 ---
 Copyright © 2010-2020 Caio Chassot, released under the MIT license
-<http://github.com/sharpstone/rack-timeout>
+<http://github.com/zombocom/rack-timeout>

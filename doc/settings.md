@@ -3,6 +3,9 @@
 Rack::Timeout has 4 settings, each of which impacts when Rack::Timeout
 will raise an exception, and which type of exception will be raised.
 
+
+Additionally there is a [demo app](https://github.com/zombocom/rack_timeout_demos) that shows the impact of changing settings and how the library behaves when a timeout is hit.
+
 ### Service Timeout
 
 `service_timeout` is the most important setting.
@@ -26,9 +29,18 @@ Wait timeout can be disabled entirely by setting the property to `0` or `false`.
 
 A request's computed wait time may affect the service timeout used for it. Basically, a request's wait time plus service time may not exceed the wait timeout. The reasoning for that is based on Heroku router's behavior, that the request would be dropped anyway after the wait timeout. So, for example, with the default settings of `service_timeout=15`, `wait_timeout=30`, a request that had 20 seconds of wait time will not have a service timeout of 15, but instead of 10, as there are only 10 seconds left before `wait_timeout` is reached. This behavior can be disabled by setting `service_past_wait` to `true`. When set, the `service_timeout` setting will always be honored. Please note that if you're using the `RACK_TIMEOUT_SERVICE_PAST_WAIT` environment variable, any value different than `"false"` will be considered `true`.
 
-The way we're able to infer a request's start time, and from that its wait time, is through the availability of the `X-Request-Start` HTTP header, which is expected to contain the time since epoch in milliseconds. (A concession is made for nginx's sec.msec notation.)
+The way we're able to infer a request's start time, and from that its wait time, is through the availability of the `X-Request-Start` HTTP header, which is expected to contain the time since UNIX epoch in milliseconds or microseconds.
 
-If the `X-Request-Start` header is not present `wait_timeout` handling is skipped entirely.
+Compatible header string formats are:
+
+- `seconds.milliseconds`, e.g. `1700173924.763` - 10.3 digits (nginx format)
+- `t=seconds.milliseconds`, e.g. `t=1700173924.763` - 10.3 digits, nginx format with [New Relic recommended][new-relic-recommended-format] `t=` prefix
+- `milliseconds`, e.g. `1700173924763` - 13 digits (Heroku format)
+- `t=microseconds`, e.g. `t=1700173924763384` - 16 digits with `t=` prefix (Apache format)
+
+[new-relic-recommended-format]: https://docs.newrelic.com/docs/apm/applications-menu/features/request-queue-server-configuration-examples/
+
+If the `X-Request-Start` header is not present, or does not match one of these formats, `wait_timeout` handling is skipped entirely.
 
 ### Wait Overtime
 
@@ -55,7 +67,7 @@ If your application timeouts fire frequently then [they can cause your applicati
 - [Ruby Application Restart Behavior](https://devcenter.heroku.com/articles/what-happens-to-ruby-apps-when-they-are-restarted)
 - [License to SIGKILL](https://www.sitepoint.com/license-to-sigkill/)
 
-**Puma SIGTERM behavior** When a Puma worker receives a `SIGTERM` it will begin to shut down, but not exit right away. It stops accepting new requests and waits for any existing requests to finish before fully shutting down. This means that only the request that experiences a timeout will be interupted, all other in-flight requests will be allowed to run until they return or also are timed out.
+**Puma SIGTERM behavior** When a Puma worker receives a `SIGTERM` it will begin to shut down, but not exit right away. It stops accepting new requests and waits for any existing requests to finish before fully shutting down. This means that only the request that experiences a timeout will be interrupted, all other in-flight requests will be allowed to run until they return or also are timed out.
 
 After the worker process exists will Puma's parent process know to boot a replacement worker. While one process is restarting, another can still serve requests (if you have more than 1 worker process per server/dyno). Between when a process exits and when a new process boots, there will be a reduction in throughput. If all processes are restarting, then incoming requests will be blocked while new processes boot.
 

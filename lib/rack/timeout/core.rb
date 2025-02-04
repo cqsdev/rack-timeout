@@ -100,9 +100,14 @@ module Rack
       @exclude           = exclude == [] ?                        ENV.fetch("RACK_TIMEOUT_EXCLUDE", []) : exclude
       @only              = only == [] ?                           ENV.fetch("RACK_TIMEOUT_ONLY", []) : only
 
-      Thread.main['RACK_TIMEOUT_COUNT'] ||= 0
-      if @term_on_timeout
-        raise "Current Runtime does not support processes" unless ::Process.respond_to?(:fork)
+      if @term_on_timeout && !::Process.respond_to?(:fork)
+        raise(NotImplementedError, <<-MSG)
+The platform running your application does not support forking (i.e. Windows, JVM, etc).
+
+To avoid this error, either specify RACK_TIMEOUT_TERM_ON_TIMEOUT=0 or
+leave it as default (which will have the same result).
+
+MSG
       end
       @app = app
     end
@@ -124,7 +129,7 @@ module Rack
         seconds_waited          = time_started_service - time_started_wait # how long it took between the web server first receiving the request and rack being able to handle it
         seconds_waited          = 0 if seconds_waited < 0                  # make up for potential time drift between the routing server and the application server
         final_wait_timeout      = wait_timeout + effective_overtime        # how long the request will be allowed to have waited
-        seconds_service_left    = final_wait_timeout - seconds_waited      # first calculation of service timeout (relevant if request doesn't get expired, may be overriden later)
+        seconds_service_left    = final_wait_timeout - seconds_waited      # first calculation of service timeout (relevant if request doesn't get expired, may be overridden later)
         info.wait               = seconds_waited                           # updating the info properties; info.timeout will be the wait timeout at this point
         info.timeout            = final_wait_timeout
 
@@ -154,13 +159,14 @@ module Rack
       timeout = RT::Scheduler::Timeout.new do |app_thread|  # creates a timeout instance responsible for timing out the request. the given block runs if timed out
         register_state_change.call :timed_out
 
-        message = "Request "
+        message = +"Request "
         message << "waited #{info.ms(:wait)}, then " if info.wait
         message << "ran for longer than #{info.ms(:timeout)} "
         if term_on_timeout
+          Thread.main['RACK_TIMEOUT_COUNT'] ||= 0
           Thread.main['RACK_TIMEOUT_COUNT'] += 1
 
-          if Thread.main['RACK_TIMEOUT_COUNT'] >= @term_on_timeout
+          if Thread.main['RACK_TIMEOUT_COUNT'] >= term_on_timeout
             message << ", sending SIGTERM to process #{Process.pid}"
             Process.kill("SIGTERM", Process.pid)
           else
@@ -188,9 +194,9 @@ module Rack
     # X-Request-Start contains the time the request was first seen by the server. Format varies wildly amongst servers, yay!
     #   - nginx gives the time since epoch as seconds.milliseconds[1]. New Relic documentation recommends preceding it with t=[2], so might as well detect it.
     #   - Heroku gives the time since epoch in milliseconds. [3]
-    #   - Apache uses t=microseconds[4], so we're not even going there.
+    #   - Apache uses t=microseconds[4], so 16 digits (until November 2286).
     #
-    # The sane way to handle this would be by knowing the server being used, instead let's just hack around with regular expressions and ignore apache entirely.
+    # The sane way to handle this would be by knowing the server being used, instead let's just hack around with regular expressions.
     # [1]: http://nginx.org/en/docs/http/ngx_http_log_module.html#var_msec
     # [2]: https://docs.newrelic.com/docs/apm/other-features/request-queueing/request-queue-server-configuration-examples#nginx
     # [3]: https://devcenter.heroku.com/articles/http-routing#heroku-headers
@@ -199,11 +205,15 @@ module Rack
     # This is a code extraction for readability, this method is only called from a single point.
     RX_NGINX_X_REQUEST_START  = /^(?:t=)?(\d+)\.(\d{3})$/
     RX_HEROKU_X_REQUEST_START = /^(\d+)$/
+    RX_APACHE_X_REQUEST_START = /^t=(\d{16})$/
     HTTP_X_REQUEST_START = "HTTP_X_REQUEST_START".freeze
     def self._read_x_request_start(env)
       return unless s = env[HTTP_X_REQUEST_START]
-      return unless m = s.match(RX_HEROKU_X_REQUEST_START) || s.match(RX_NGINX_X_REQUEST_START)
-      Time.at(m[1,2].join.to_f / 1000)
+      if m = s.match(RX_HEROKU_X_REQUEST_START) || s.match(RX_NGINX_X_REQUEST_START)
+        Time.at(m[1,2].join.to_f / 1000)
+      elsif m = s.match(RX_APACHE_X_REQUEST_START)
+        Time.at(m[1].to_f / 1_000_000)
+      end
     end
 
     # This method determines if a body is present. requests with a body (generally POST, PUT) can have a lengthy body which may have taken a while to be received by the web server, inflating their computed wait time. This in turn could lead to unwanted expirations. See wait_overtime property as a way to overcome those.
