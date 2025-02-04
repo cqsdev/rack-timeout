@@ -15,7 +15,7 @@ Pass an an array of paths strings you want to exclude from or only run timeout f
 
 ```ruby
 # Gemfile
-gem "rack-timeout", require:"rack/timeout/base", :git => 'git://github.com/mkrl/rack-timeout.git'
+gem "rack-timeout", require:"rack/timeout/base", :git => 'git://github.com/cqsdev/rack-timeout.git'
 ```
 
 ```ruby
@@ -40,6 +40,7 @@ service_timeout:   15     # RACK_TIMEOUT_SERVICE_TIMEOUT
 wait_timeout:      30     # RACK_TIMEOUT_WAIT_TIMEOUT
 wait_overtime:     60     # RACK_TIMEOUT_WAIT_OVERTIME
 service_past_wait: false  # RACK_TIMEOUT_SERVICE_PAST_WAIT
+term_on_timeout:   false  # RACK_TIMEOUT_TERM_ON_TIMEOUT
 exclude:           []     # RACK_TIMEOUT_EXCLUDE
 only:              []     # RACK_TIMEOUT_ONLY
 ```
@@ -58,5 +59,5 @@ use Rack::Timeout::Select, service_timeout: 5, exclude: ["api"]
 Please note that you may have controller actions with names similar to your excludes/targets, use with wise.
 
 ---
-Copyright © 2010-2016 Caio Chassot, released under the MIT license
-<http://github.com/heroku/rack-timeout>
+Copyright © 2010-2020 Caio Chassot, released under the MIT license
+<http://github.com/sharpstone/rack-timeout>
